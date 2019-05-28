@@ -4,8 +4,8 @@ from pyscf import fci
 
 
 class system:
-    def __init__(self, nelec, nx, ny, U, t, delta, cycles, lat_type='square'):
-        self.lat = hub.Lattice(nx, ny, lat_type)
+    def __init__(self, nelec, nx, ny, U, t, delta, cycles, lat_type='square',bc=None):
+        self.lat = hub.Lattice(nx, ny, lat_type,bc)
         self.nsites = self.lat.nsites
         self.nup = nelec[0]
         self.ndown = nelec[1]
@@ -19,9 +19,7 @@ class system:
         assert self.ndown <= self.nsites, 'Too many downs!'
         self.h2 = self.two_elec_ham()
         self.h1 = hub.create_1e_ham(self.lat, True)
-
         self.delta = delta  # timestep
-
         # Change this to change perturbation
         # Set perturbation to HHG perturbation
         # Set constants required (in future, this should be a kwargs to __init__
@@ -30,12 +28,16 @@ class system:
         # field=1
         F0 = 10.
         # F0 = 12.
-        a = 7.56
-        self.field = field * self.factor * 0.0000241888
+        a = 4.
+        #field = angular frequency and freq = field/2pi
+        self.field = field * self.factor * 0.0001519828442
+        self.freq = self.field/(2.*np.pi)
         self.a = (a * 1.889726125) / self.factor
         self.F0 = F0 * 1.944689151e-4 * (self.factor ** 2.)
         self.cycles = cycles
-        self.n_time = int(self.cycles / self.delta)  # Number of time points in propagation
+        self.simT = self.cycles / self.freq
+        #self.n_time = int(self.cycles / self.delta)  # Number of time points in propagation for scaled time
+        self.n_time = int(self.simT / self.delta)  # Number of time points in propagation for real time
         # self.full_1e_ham should return a function which gives the 1e hamiltonian + perturbation with the current time as an argument
 
     def two_elec_ham(self):
@@ -45,14 +47,11 @@ class system:
         return h2
 
     def phi(self, current_time):
-        # original phi, scaled
-        phi = self.a * self.F0 / (2. * np.pi * self.field) * (
-                np.sin(np.pi * current_time / self.cycles) ** 2.) * np.sin(2. * np.pi * current_time)
+        #original phi, scaled time
+        #phi = self.a * self.F0 / self.field * (np.sin(np.pi * current_time / self.cycles) ** 2.) * np.sin(2. * np.pi * current_time)
 
-        # Phi using real time
-        # phi = self.a * self.F0 / (2*np.pi*self.field) * (
-        #         np.sin(np.pi * current_time / (self.cycles / self.field)) ** 2.) * np.sin(
-        #     2*np.pi*self.field * current_time)
+        #original phi, real time
+        phi = self.a * self.F0 / self.field * (np.sin(self.field * current_time / (2. * self.cycles)) ** 2.) * np.sin(self.field * current_time)
         return phi
 
     def apply_hhg_pert(self, current_time):
@@ -60,7 +59,6 @@ class system:
             phi = 0.
         else:
             phi = self.phi(current_time)
-            # this uses scaled time: tau=field*t
         return np.exp(1j * phi) * np.triu(self.h1) + np.exp(-1j * phi) * np.tril(self.h1)
 
     full_1e_ham = apply_hhg_pert
