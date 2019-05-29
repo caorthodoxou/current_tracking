@@ -57,8 +57,8 @@ def RK1(sys, current_time, psi):
     """Euler step for time evolution"""
 
     h1 = sys.full_1e_ham(current_time)
-    #k1 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1, psi)
-    k1 = -1j * sys.delta * apply_H(sys, h1, psi)
+    #k1 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1, psi) #scaled time
+    k1 = -1j * sys.delta * apply_H(sys, h1, psi) #real time
     return psi + k1
 
 
@@ -212,3 +212,25 @@ def DHP(sys,psi):
     for i in range(sys.nsites):
         D+=dc.compute_inner_product(psi,sys.ne,(sys.nup,sys.ndown),[i,i,i,i],[1,0,1,0],[1,1,0,0])
     return D.real/sys.nsites
+
+def current2(lat,h,current_time,cycles):
+    if lat.field==0.:
+        phi=0.
+    else:
+        #phi=(lat.a*lat.F0/lat.field)*(np.sin(np.pi*current_time/cycles)**2.)*np.sin(2.*np.pi*current_time)
+        phi = lat.a * lat.F0 / lat.field * (np.sin(lat.field * current_time / (2. * lat.cycles)) ** 2.) * np.sin(lat.field * current_time)
+    return 1.j*lat.a*lat.t*(np.exp(-1j*phi)*np.tril(h)-np.exp(1j*phi)*np.triu(h))
+
+def fJ(lat,J,psi):
+    psi_r=psi.real
+    psi_i=psi.imag 
+    Jr=J.real
+    Ji=J.imag
+    #J|psi>=(J_r+iJ_i)|psi>=(J_r+iJ_i)|psi_r>+i(J_r+iJ_i)|psi_i>
+    pro = one_elec(lat,Jr,psi_r) + 1j*one_elec(lat,Ji,psi_r,False) + 1j*one_elec(lat,Jr,psi_i) \
+    - one_elec(lat,Ji,psi_i,False)
+    return pro
+
+def J_expectation(lat,h,psi,current_time,cycles):
+    J=current2(lat,h,current_time,cycles)
+    return (np.dot(psi.conj(),fJ(lat,J,psi))).real
