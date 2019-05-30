@@ -44,12 +44,12 @@ def progress(total, current):
         print("Simulation Progress: " + str(round(100 * current / total)) + "%")
     return
 
-
-nelec = (3, 3)
-nx = 6
+test = True
+nelec = (2, 2)
+nx = 4
 ny = 0
 t = 0.52
-U = 5.0 * t
+U = 0.0 * t
 delta = 2.e-2
 cycles = 5.
 
@@ -77,7 +77,7 @@ while r.successful() and r.t < prop.simT:
     r.integrate(r.t + delta)
     psi = r.y
     time = r.t
-    # add to expectations
+   # add to expectations
     D.append(evolve.DHP(prop,psi))
     progress(prop.n_time, int(time / delta))
     neighbour.append(evolve.nearest_neighbour(prop, psi))
@@ -94,7 +94,7 @@ del phi_reconstruct[0:2]
 #and phi in hams.py, and the alternative RK4 in evolve.py, and decrease delta
 #time = 0.
 #for i in range(prop.n_time):
-#    psi = evolve.RK4(prop, time, psi)
+#    psi = evolve.RK4(prop, time, psi, test)
 #    time += delta
     # add to expectations
 #    D.append(evolve.DHP(prop,psi))
@@ -107,7 +107,7 @@ del phi_reconstruct[0:2]
 #    phi, branch = evolve.phi_reconstruct(prop, J_field[-1], neighbour[-1], phi_reconstruct[-1], phi_reconstruct[-2], branch)
 #    phi_reconstruct.append(phi)
 #    boundary_1.append(evolve.boundary_term_1(prop, psi))
-#    boundary_2.append(evolve.boundary_term_2(prop, psi))
+ #   boundary_2.append(evolve.boundary_term_2(prop, psi))
 #del phi_reconstruct[0:2]
 
 # Plotting
@@ -169,7 +169,7 @@ J_grad = -2. * prop.a * prop.t * np.gradient(phi_original, delta) * np.abs(neigh
 
 exact = np.gradient(J_field.real, delta) 
 #should it be a + sign in eq32?
-eq32 = J_grad - prop.a * prop.t * prop.U * extra
+eq32 = J_grad + prop.a * prop.t * prop.U * extra
 eq33 = J_grad + 2. * prop.a * prop.t * (np.gradient(np.angle(neighbour), delta) * np.abs(neighbour) * np.cos(diff) - np.gradient(
     np.abs(neighbour), delta) * np.sin(diff))
 

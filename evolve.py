@@ -1,10 +1,10 @@
 import numpy as np
-import hub_lats as hub
+#import hub_lats as hub
 from pyscf import fci
 import des_cre as dc
 
 
-def apply_H(sys, h1, psi):
+def apply_H(sys, h1, psi, test=False):
     """Apply hamiltonian to arbitrary wavefunction, using given h1 + sys.h2. This is the hubbard hamiltonian + perturbation.
         Real and imaginary parts of wavefunction are dealt with separately"""
     psi_r = psi.real
@@ -12,18 +12,30 @@ def apply_H(sys, h1, psi):
     h1_r = h1.real
     h1_i = h1.imag
     # H|psi>=(h1+h2)|psi>=(h1_r+ih1_i+h2)|psi>=(h1_r+ih1_i+h2)|psi_r>+i(h1_r+ih1_i+h2)|psi_i>
-    pro = one_elec(sys, h1_r, psi_r) + 1j * one_elec(sys, h1_i, psi_r, False) \
-              + 1j * one_elec(sys, h1_r, psi_i) - one_elec(sys, h1_i, psi_i, False) + two_elec(sys, psi_r, psi_i)
+    pro = one_elec(sys, h1_r, psi_r, test) + 1j * one_elec(sys, h1_i, psi_r, False, test) \
+              + 1j * one_elec(sys, h1_r, psi_i, test) - one_elec(sys, h1_i, psi_i, False, test) + two_elec(sys, psi_r, psi_i)
     return pro.flatten()
 
 
-def one_elec(sys, h1, psi, sym=True):
+def one_elec(sys, h1, psi, sym=True, test=False):
     """Apply one-electron hamiltonian, h1
          sym tells us whether this is a symmetric (real) hamiltonian or not"""
     if sym:
-        return fci.direct_spin1.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+        if test:
+            pyscf_contract = fci.direct_spin1.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            slow_contract = dc.apply_one_e_ham_slow(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            assert(np.allclose(pyscf_contract,slow_contract))
+            return pyscf_contract
+        else:
+            return fci.direct_spin1.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
     else:
-        return fci.direct_nosym.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+        if test:
+            pyscf_contract = fci.direct_nosym.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            slow_contract = dc.apply_one_e_ham_slow(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            assert(np.allclose(pyscf_contract,slow_contract))
+            return pyscf_contract
+        else:
+            return fci.direct_nosym.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
 
 
 def two_elec(sys, psi_r, psi_i):
@@ -33,23 +45,23 @@ def two_elec(sys, psi_r, psi_i):
     return pro.flatten()
 
 
-def RK4(sys, current_time, psi):
+def RK4(sys, current_time, psi, test):
     """4th Order Runge-Kutta step for time evolution"""
     
     h1_k1 = sys.full_1e_ham(current_time) 
-    #k1 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k1, psi) #scaled time
-    k1 = -1j * sys.delta * apply_H(sys, h1_k1, psi) #real time
+    #k1 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k1, psi, test) #scaled time
+    k1 = -1j * sys.delta * apply_H(sys, h1_k1, psi, test) #real time
     
     h1_k2 = sys.full_1e_ham(current_time + 0.5 * sys.delta)
-    #k2 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k2, psi + 0.5 * k1) #scaled time
-    k2 = -1j * sys.delta * apply_H(sys, h1_k2, psi + 0.5 * k1) #real time
+    #k2 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k2, psi + 0.5 * k1, test) #scaled time
+    k2 = -1j * sys.delta * apply_H(sys, h1_k2, psi + 0.5 * k1, test) #real time
     
-    #k3 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k2, psi + 0.5 * k2) #scaled time
-    k3 = -1j * sys.delta * apply_H(sys, h1_k2, psi + 0.5 * k2) #real time
+    #k3 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k2, psi + 0.5 * k2, test) #scaled time
+    k3 = -1j * sys.delta * apply_H(sys, h1_k2, psi + 0.5 * k2, test) #real time
     
     h1_k4 = sys.full_1e_ham(current_time + sys.delta)
-    #k4 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k4, psi + k3) #scaled time
-    k4 = -1j * sys.delta * apply_H(sys, h1_k4, psi + k3) #real time
+    #k4 = (-1j * sys.delta / sys.freq) * apply_H(sys, h1_k4, psi + k3, test) #scaled time
+    k4 = -1j * sys.delta * apply_H(sys, h1_k4, psi + k3, test) #real time
     return psi + (k1 + 2. * k2 + 2. * k3 + k4) / 6.
 
 
@@ -207,11 +219,11 @@ def integrate_f(t, psi, sys):
 
 def DHP(sys,psi):
     """Double occupancy"""
-    psi=np.reshape(psi,(fci.cistring.num_strings(sys.nsites,sys.nup),fci.cistring.num_strings(sys.nsites,sys.ndown)))
-    D=0.
+    psi = np.reshape(psi,(fci.cistring.num_strings(sys.nsites,sys.nup),fci.cistring.num_strings(sys.nsites,sys.ndown)))
+    D = 0.
     for i in range(sys.nsites):
-        D+=dc.compute_inner_product(psi,sys.ne,(sys.nup,sys.ndown),[i,i,i,i],[1,0,1,0],[1,1,0,0])
-    return D.real/sys.nsites
+        D += dc.compute_inner_product(psi,sys.ne,(sys.nup,sys.ndown),[i,i,i,i],[1,0,1,0],[1,1,0,0])
+    return D.real / sys.nsites
 
 def current2(lat,h,current_time,cycles):
     if lat.field==0.:
