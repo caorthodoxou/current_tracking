@@ -1,5 +1,5 @@
 import numpy as np
-import hub_lats as hub
+#import hub_lats as hub
 from pyscf import fci
 import des_cre as dc
 
@@ -14,8 +14,23 @@ def apply_H(sys, h1, psi):
     # H|psi>=(h1+h2)|psi>=(h1_r+ih1_i+h2)|psi>=(h1_r+ih1_i+h2)|psi_r>+i(h1_r+ih1_i+h2)|psi_i>
     pro = one_elec(sys, h1_r, psi_r) + 1j * one_elec(sys, h1_i, psi_r, False) \
               + 1j * one_elec(sys, h1_r, psi_i) - one_elec(sys, h1_i, psi_i, False) + two_elec(sys, psi_r, psi_i)
-    return pro.flatten()
+    return pro
 
+def apply_H_cheat(sys, h1, psi):
+    """This includes the if-statement which removes the imaginary part of the 1e-ham.
+    I've found that this needs to be included for low U/t (approx <2) for unknown reasons, and
+    in particular at U/t=0"""
+    psi_r = psi.real
+    psi_i = psi.imag 
+    h1_r = h1.real
+    h1_i = h1.imag
+    #H|psi>=(h1+h2)|psi>=(h1_r+ih1_i+h2)|psi>=(h1_r+ih1_i+h2)|psi_r>+i(h1_r+ih1_i+h2)|psi_i>
+    if sys.U > 0.0:
+        pro = one_elec(sys, h1_r, psi_r) + 1.j*one_elec(sys, h1_i, psi_r, False) \
+        + 1.j*one_elec(sys, h1_r, psi_i) - one_elec(sys, h1_i, psi_i, False) + two_elec(sys, psi_r, psi_i)
+    else:
+        pro = one_elec(sys, h1_r, psi_r) + 1.j*one_elec(sys, h1_r, psi_i) + two_elec(sys, psi_r, psi_i)
+    return pro
 
 def one_elec(sys, h1, psi, sym=True):
     """Apply one-electron hamiltonian, h1
@@ -25,6 +40,25 @@ def one_elec(sys, h1, psi, sym=True):
     else:
         return fci.direct_nosym.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
 
+def one_elec_debug(sys, h1, psi, sym=True):
+    """This can be used for debugging"""
+    test = True
+    if sym:
+        if test:
+            pyscf_contract = fci.direct_spin1.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            slow_contract = dc.apply_one_e_ham_slow(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            assert(np.allclose(pyscf_contract,slow_contract))
+            return pyscf_contract
+        else:
+            return fci.direct_spin1.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+    else:
+        if test:
+            pyscf_contract = fci.direct_nosym.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            slow_contract = dc.apply_one_e_ham_slow(h1, psi, sys.nsites, (sys.nup, sys.ndown))
+            assert(np.allclose(pyscf_contract,slow_contract))
+            return pyscf_contract
+        else:
+            return fci.direct_nosym.contract_1e(h1, psi, sys.nsites, (sys.nup, sys.ndown))
 
 def two_elec(sys, psi_r, psi_i):
     """ Apply 2-electron hubbard hamiltonian"""

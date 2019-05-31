@@ -45,12 +45,12 @@ def progress(total, current):
     return
 
 
-nelec = (3, 3)
-nx = 6
+nelec = (2, 2)
+nx = 4
 ny = 0
 t = 0.52
 U = 5.0 * t
-delta = 2.e-2
+delta = 1.e-1
 cycles = 5.
 
 prop = hams.system(nelec, nx, ny, U, t, delta, cycles, bc='pbc')
@@ -103,7 +103,6 @@ del phi_reconstruct[0:2]
 #    phi_original.append(prop.phi(time))
 #    two_body.append(evolve.two_body(prop, psi))
 #    J_field.append(evolve.current(prop, phi_original[-1], neighbour[-1]))
-    #J_field.append(evolve.J_expectation(prop,hub.create_1e_ham(prop.lat,True),psi,time,cycles))
 #    phi, branch = evolve.phi_reconstruct(prop, J_field[-1], neighbour[-1], phi_reconstruct[-1], phi_reconstruct[-2], branch)
 #    phi_reconstruct.append(phi)
 #    boundary_1.append(evolve.boundary_term_1(prop, psi))

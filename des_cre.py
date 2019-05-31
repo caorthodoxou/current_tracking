@@ -187,3 +187,93 @@ def compute_inner_product(civec, norbs, nelecs, ops, cres, alphas):
                 nelecb -= 1
     return numpy.dot(civec.conj().flatten(), ciket.flatten())
 
+def compute_inner_product_debug(civec, norbs, nelecs, ops, cres, alphas):
+    """This produces error messages saying that the imaginary parts are being 
+    discarded. This is because of the parts of the above functions that make 
+    them usable with complex wavefunctions (e.g. lines 152 and 157 in cre_b)"""
+    neleca, nelecb = nelecs
+    ciket = civec.copy()
+    assert(len(ops)==len(cres))
+    assert(len(ops)==len(alphas))
+    if civec.dtype == 'complex128':
+        civec_r = civec.real.copy()
+        civec_i = civec.imag.copy()
+        #print civec.dtype,civec_r.dtype,civec_i.dtype
+        for i in reversed(range(len(ops))):
+            if alphas[i]:
+                if cres[i]:
+                    civec_r = cre_a(civec_r, norbs, (neleca, nelecb), ops[i])
+                    neleca += 1
+                else:
+                    if neleca==0:
+                        return 0
+                    civec_r = des_a(civec_r, norbs, (neleca, nelecb), ops[i])
+                    neleca -= 1
+            else:
+                if cres[i]:
+                    civec_r = cre_b(civec_r, norbs, (neleca, nelecb), ops[i])
+                    nelecb += 1
+                else:
+                    if nelecb==0:
+                        return 0
+                    civec_r = des_b(civec_r, norbs, (neleca, nelecb), ops[i])
+                    nelecb -= 1
+        for i in reversed(range(len(ops))):
+            if alphas[i]:
+                if cres[i]:
+                    civec_i = cre_a(civec_i, norbs, (neleca, nelecb), ops[i])
+                    neleca += 1
+                else:
+                    if neleca==0:
+                        return 0
+                    civec_i = des_a(civec_i, norbs, (neleca, nelecb), ops[i])
+                    neleca -= 1
+            else:
+                if cres[i]:
+                    civec_i = cre_b(civec_i, norbs, (neleca, nelecb), ops[i])
+                    nelecb += 1
+                else:
+                    if nelecb==0:
+                        return 0
+                    civec_i = des_b(civec_i, norbs, (neleca, nelecb), ops[i])
+                    nelecb -= 1
+        ciket = civec_r + 1.j*civec_i
+    else:
+        for i in reversed(range(len(ops))):
+            if alphas[i]:
+                if cres[i]:
+                    ciket = cre_a(ciket, norbs, (neleca, nelecb), ops[i])
+                    neleca += 1
+                else:
+                    if neleca==0:
+                        return 0
+                    ciket = des_a(ciket, norbs, (neleca, nelecb), ops[i])
+                    neleca -= 1
+            else:
+                if cres[i]:
+                    ciket = cre_b(ciket, norbs, (neleca, nelecb), ops[i])
+                    nelecb += 1
+                else:
+                    if nelecb==0:
+                        return 0
+                    ciket = des_b(ciket, norbs, (neleca, nelecb), ops[i])
+                    nelecb -= 1
+    return numpy.dot(civec.conj().flatten(), ciket.flatten())
+
+def apply_one_e_ham_slow(h1, psi, n, nelec):
+    n_up, n_down = nelec
+    psi_new = psi.copy()
+    psi_final = numpy.zeros_like(psi)
+    psi_tmp = numpy.zeros_like(psi)
+    for i in range(n):
+        for j in range(n):
+            psi_tmp = des_a(psi_new, n, (n_up, n_down), j)
+            psi_tmp = cre_a(psi_tmp, n, (n_up-1, n_down), i)
+            psi_tmp *= h1[i,j]   # Is this the right way around for the definition?!
+            psi_final += psi_tmp.reshape(psi_final.shape)
+
+            psi_tmp = des_b(psi_new, n, (n_up, n_down), j)
+            psi_tmp = cre_b(psi_tmp, n, (n_up, n_down-1), i)
+            psi_tmp *= h1[i,j]   # Is this the right way around for the definition?! Do we want to take the complex conjugate for correct definition?
+            psi_final += psi_tmp.reshape(psi_final.shape)
+    return psi_final
